@@ -37,7 +37,7 @@ func (c *Client) Members(guildID discord.GuildID, limit uint) ([]discord.Member,
 func (c *Client) MembersAfter(
 	guildID discord.GuildID, after discord.UserID, limit uint) ([]discord.Member, error) {
 
-	mems := make([]discord.Member, 0, limit)
+	var mems []discord.Member
 
 	fetch := uint(maxMemberFetchLimit)
 
@@ -46,29 +46,27 @@ func (c *Client) MembersAfter(
 	for limit > 0 || unlimited {
 		// Only fetch as much as we need. Since limit gradually decreases,
 		// we only need to fetch min(fetch, limit).
-		if limit > 0 {
-			fetch = uint(min(maxMessageFetchLimit, int(limit)))
+
+		if !unlimited {
+			fetch = uint(min(maxMemberFetchLimit, int(limit)))
 			limit -= fetch
+		} else {
+			fetch = 1000
 		}
 
 		m, err := c.membersAfter(guildID, after, fetch)
-		if err != nil {
+		// when an empty list of members is recieved it is probable that
+		// there are no remaining guild members, also if there is an error		
+		if err != nil || len(m) == 0 {
 			return mems, err
 		}
-		mems = append(mems, m...)
 
-		// There aren't any to fetch, even if this is less than limit.
-		if len(m) < maxMemberFetchLimit {
-			break
-		}
+		mems = append(mems, m...)
 
 		after = mems[len(mems)-1].User.ID
 	}
 
-	if len(mems) == 0 {
-		return nil, nil
-	}
-
+	// returns a list even if the list is empty
 	return mems, nil
 }
 
