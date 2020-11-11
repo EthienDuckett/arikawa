@@ -366,10 +366,11 @@ func (c *Client) deleteMessages(channelID discord.ChannelID, messageIDs []discor
 	}
 
 	param.Messages = messageIDs
-
+// 	Removed /channels/<channel_id>/messages/bulk-delete in favor of 
+// 	/channels/<channel_id>/messages/bulk_delete/ (gateway v8)
 	return c.FastRequest(
 		"POST",
-		EndpointChannels+channelID.String()+"/messages/bulk-delete",
+		EndpointChannels+channelID.String()+"/messages/bulk-delete/",
 		httputil.WithJSONBody(param),
 	)
 }
