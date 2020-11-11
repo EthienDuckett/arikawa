@@ -30,6 +30,58 @@ func (bot *Bot) Help(*gateway.MessageCreateEvent) (string, error) {
 	return bot.Ctx.Help(), nil
 }
 
+// list the roles of a guild using it's guildID
+func (bot *Bot) ListRoles(_ *gateway.MessageCreateEvent, ID discord.GuildID) (string, error) {
+	roles, err := bot.Ctx.State.Roles(ID)
+	var rolesS []string
+	// create string from []discord.Role
+	for _, i := range roles {
+		rolesS = append(rolesS, i.Name)
+	}
+	return strings.Join(rolesS, "\n"), err
+}
+
+// nickname the bot
+func (bot *Bot) Nick(m *gateway.MessageCreateEvent, f bot.RawArguments) error {
+	err := bot.Ctx.ChangeOwnNickname(m.GuildID, string(f))
+	return err
+}
+
+func annoying(bot *Bot, channelID discord.ChannelID) {
+	// wait for 3 seconds to see if a message says 'stop'
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	// This might miss events that are sent immediately after. To make sure all
+	// events are caught, ChanFor should be used.
+	v := bot.Ctx.WaitFor(ctx, func(v interface{}) bool {
+		// Incoming event is a message create event:
+		mg, ok := v.(*gateway.MessageCreateEvent)
+		if !ok {
+			return false
+		}
+
+		// Message is equal to the string 'stop'
+		return mg.Content == "stop"
+	})
+	if v != nil {
+		return
+	}
+	_, err := bot.Ctx.SendMessage(channelID, "annoying", nil)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	annoying(bot, channelID)
+}
+
+func (bot *Bot) BeAnnoying(m *gateway.MessageCreateEvent, channelID discord.ChannelID) error {
+	// is annoying
+	go annoying(bot, channelID)
+	return nil
+}
+
 // Add demonstrates the usage of typed arguments. Run it with "~add 1 2".
 func (bot *Bot) Add(_ *gateway.MessageCreateEvent, a, b int) (string, error) {
 	return fmt.Sprintf("%d + %d = %d", a, b, a+b), nil
