@@ -55,7 +55,7 @@ func (c *Client) MembersAfter(
 		}
 
 		m, err := c.membersAfter(guildID, after, fetch)
-		// when an empty list of members is recieved it is probable that
+		// when an empty list of members is received it is probable that
 		// there are no remaining guild members, also if there is an error		
 		if err != nil || len(m) == 0 {
 			return mems, err
