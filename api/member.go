@@ -51,7 +51,7 @@ func (c *Client) MembersAfter(
 			fetch = uint(min(maxMemberFetchLimit, int(limit)))
 			limit -= fetch
 		} else {
-			fetch = 1000
+			fetch = maxMemberFetchLimit
 		}
 
 		m, err := c.membersAfter(guildID, after, fetch)
