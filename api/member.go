@@ -5,9 +5,10 @@ import (
 	"github.com/diamondburned/arikawa/v2/utils/httputil"
 	"github.com/diamondburned/arikawa/v2/utils/json/option"
 )
-
-const maxMemberFetchLimit = 1000
-
+const (
+	maxMemberFetchLimit = 1000
+	defaultMemberFetchLimit = 1
+)
 // Member returns a guild member object for the specified user.
 func (c *Client) Member(guildID discord.GuildID, userID discord.UserID) (*discord.Member, error) {
 	var m *discord.Member
@@ -75,9 +76,9 @@ func (c *Client) membersAfter(
 
 	switch {
 	case limit == 0:
-		limit = 0
-	case limit > 1000:
-		limit = 1000
+		limit = defaultMemberFetchLimit
+	case limit > maxMemberFetchLimit:
+		limit = maxMemberFetchLimit
 	}
 
 	var param struct {
