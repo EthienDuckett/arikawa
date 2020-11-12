@@ -10,10 +10,12 @@ import (
 
 const (
 	// the limit of max messages per request, as imposed by Discord
+	defaultFetchLimit = 50
 	maxMessageFetchLimit = 100
 	// maxMessageDeleteLimit is the limit of max message that can be deleted
 	// per bulk delete request, as imposed by Discord.
 	maxMessageDeleteLimit = 100
+	
 )
 
 // Messages returns a slice filled with the most recent messages sent in the
@@ -28,6 +30,7 @@ const (
 // When fetching the messages, those with the highest ID, will be fetched
 // first.
 // The returned slice will be sorted from latest to oldest.
+// requires the VIEW_CHANNEL permission
 func (c *Client) Messages(channelID discord.ChannelID, limit uint) ([]discord.Message, error) {
 	// Since before is 0 it will be omitted by the http lib, which in turn
 	// will lead discord to send us the most recent messages without having to
@@ -38,7 +41,13 @@ func (c *Client) Messages(channelID discord.ChannelID, limit uint) ([]discord.Me
 // MessagesAround returns messages around the ID, with a limit of 100.
 func (c *Client) MessagesAround(
 	channelID discord.ChannelID, around discord.MessageID, limit uint) ([]discord.Message, error) {
-
+	// 0 would lead to around becoming omitted, because this is the
+	// MessagesAround function it will automatically be corrected	
+	// Note that this function will act similar to MessagesAfter if
+	// you give it a small id, due to there being nothing before it
+	if around == 0 {
+		around = 1
+	}
 	return c.messagesRange(channelID, 0, 0, around, limit)
 }
 
@@ -54,8 +63,13 @@ func (c *Client) MessagesAround(
 // The returned slice will be sorted from latest to oldest.
 func (c *Client) MessagesBefore(
 	channelID discord.ChannelID, before discord.MessageID, limit uint) ([]discord.Message, error) {
-
-	msgs := make([]discord.Message, 0, limit)
+	// 0 would lead to before becoming omitted, because this is the
+	// MessagesBefore function it will automatically be corrected	
+	if before == 0 {
+		before = 1
+	}
+	
+	var msgs []discord.Message
 
 	fetch := uint(maxMessageFetchLimit)
 
@@ -64,29 +78,25 @@ func (c *Client) MessagesBefore(
 	unlimited := limit == 0
 
 	for limit > 0 || unlimited {
-		if limit > 0 {
+		if !unlimited {
 			// Only fetch as much as we need. Since limit gradually decreases,
 			// we only need to fetch min(fetch, limit).
 			fetch = uint(min(maxMessageFetchLimit, int(limit)))
 			limit -= maxMessageFetchLimit
+		} else {
+			fetch = maxMessageFetchLimit
 		}
 
 		m, err := c.messagesRange(channelID, before, 0, 0, fetch)
-		if err != nil {
+		// if an empty list of guilds is received it is probable that
+		// there are no remaining guilds, also if there is an error
+		if err != nil || len(m) == 0 {
 			return msgs, err
 		}
 		// Append the older messages into the list of newer messages.
 		msgs = append(msgs, m...)
 
-		if len(m) < maxMessageFetchLimit {
-			break
-		}
-
 		before = m[len(m)-1].ID
-	}
-
-	if len(msgs) == 0 {
-		return nil, nil
 	}
 
 	return msgs, nil
@@ -105,9 +115,8 @@ func (c *Client) MessagesBefore(
 func (c *Client) MessagesAfter(
 	channelID discord.ChannelID, after discord.MessageID, limit uint) ([]discord.Message, error) {
 
-	// 0 is uint's zero value and will lead to the after param getting omitted,
-	// which in turn will lead to the most recent messages being returned.
-	// Setting this to 1 will prevent that.
+	// 0 would lead to after becoming omitted, because this is the
+	// MessagesAfter function it will automatically be corrected	
 	if after == 0 {
 		after = 1
 	}
@@ -129,21 +138,14 @@ func (c *Client) MessagesAfter(
 		}
 
 		m, err := c.messagesRange(channelID, 0, after, 0, fetch)
-		if err != nil {
+		if err != nil || len(m) {
 			return msgs, err
 		}
 		// Prepend the older messages into the newly-fetched messages list.
 		msgs = append(m, msgs...)
 
-		if len(m) < maxMessageFetchLimit {
-			break
-		}
-
+		// select the smallest ID
 		after = m[0].ID
-	}
-
-	if len(msgs) == 0 {
-		return nil, nil
 	}
 
 	return msgs, nil
@@ -154,9 +156,9 @@ func (c *Client) messagesRange(
 
 	switch {
 	case limit == 0:
-		limit = 50
-	case limit > 100:
-		limit = 100
+		limit = defaultFetchLimit
+	case limit > maxMessageFetchLimit:
+		limit = maxMessageFetchLimit
 	}
 
 	var param struct {
@@ -166,12 +168,21 @@ func (c *Client) messagesRange(
 
 		Limit uint `schema:"limit"`
 	}
-
-	param.Before = before
-	param.After = after
-	param.Around = around
+	// please note in the future: ZERO IS NOT EMPTY or (a good replacement for)
+	// NULL, IT WILL BE COUNTED AS AN ID
+	// potential fixes: use integer pointers, use a structure
+	// current fix is to set the ID to 1 if it is being used and
+	// check if the ID is greater than zero in the range function
+	switch {
+	case after > 0:
+		param.After = after
+	case before > 0:
+		param.Before = before
+	case around > 0:
+		param.Around = around
+	}
 	param.Limit = limit
-
+	
 	var msgs []discord.Message
 	return msgs, c.RequestJSON(
 		&msgs, "GET",
