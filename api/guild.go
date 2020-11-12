@@ -137,35 +137,32 @@ func (c *Client) Guilds(limit uint) ([]discord.Guild, error) {
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Guild, error) {
-	guilds := make([]discord.Guild, 0, limit)
+	var guilds []discord.Guild
 
 	fetch := uint(maxGuildFetchLimit)
 
 	unlimited := limit == 0
 
 	for limit > 0 || unlimited {
-		if limit > 0 {
+		if !unlimited {
 			// Only fetch as much as we need. Since limit gradually decreases,
 			// we only need to fetch min(fetch, limit).
-			fetch = uint(min(maxMessageFetchLimit, int(limit)))
+			fetch = uint(min(maxGuildFetchLimit, int(limit)))
 			limit -= fetch
+		} else {
+			fetch = maxGuildFetchLimit
 		}
 
 		g, err := c.guildsRange(before, 0, fetch)
-		if err != nil {
+		// if an empty list of guilds is received it is probable that
+		// there are no remaining guilds, also if there is an error
+		if err != nil || len(g) == 0 {
 			return guilds, err
 		}
+		// prepend g to guilds
 		guilds = append(g, guilds...)
 
-		if len(g) < maxGuildFetchLimit {
-			break
-		}
-
 		before = g[0].ID
-	}
-
-	if len(guilds) == 0 {
-		return nil, nil
 	}
 
 	return guilds, nil
@@ -182,35 +179,31 @@ func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Gui
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) GuildsAfter(after discord.GuildID, limit uint) ([]discord.Guild, error) {
-	guilds := make([]discord.Guild, 0, limit)
+	var guilds []discord.Guild
 
 	fetch := uint(maxGuildFetchLimit)
 
 	unlimited := limit == 0
 
 	for limit > 0 || unlimited {
-		if limit > 0 {
+		if !unlimited {
 			// Only fetch as much as we need. Since limit gradually decreases,
 			// we only need to fetch min(fetch, limit).
-			fetch = uint(min(maxMessageFetchLimit, int(limit)))
+			fetch = uint(min(maxGuildFetchLimit, int(limit)))
 			limit -= fetch
+		} else {
+			fetch = maxGuildFetchLimit
 		}
 
 		g, err := c.guildsRange(0, after, fetch)
-		if err != nil {
+		// if an empty list of guilds is received it is probable that
+		// there are no remaining guilds, also if there is an error
+		if err != nil || len(g) == 0 {
 			return guilds, err
 		}
 		guilds = append(guilds, g...)
 
-		if len(g) < maxGuildFetchLimit {
-			break
-		}
-
 		after = g[len(g)-1].ID
-	}
-
-	if len(guilds) == 0 {
-		return nil, nil
 	}
 
 	return guilds, nil
