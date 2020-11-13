@@ -11,8 +11,10 @@ import (
 
 // maxGuildFetchLimit is the limit of max guilds per request, as imposed by
 // Discord.
-const maxGuildFetchLimit = 100
-
+const (
+	maxGuildFetchLimit = 100
+	defaultGuildFetchLimit = 1
+)
 var EndpointGuilds = Endpoint + "guilds/"
 
 // https://discord.com/developers/docs/resources/guild#create-guild-json-params
@@ -137,6 +139,9 @@ func (c *Client) Guilds(limit uint) ([]discord.Guild, error) {
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Guild, error) {
+	if before == 0 {
+		before = 1	
+	}
 	var guilds []discord.Guild
 
 	fetch := uint(maxGuildFetchLimit)
@@ -149,8 +154,6 @@ func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Gui
 			// we only need to fetch min(fetch, limit).
 			fetch = uint(min(maxGuildFetchLimit, int(limit)))
 			limit -= fetch
-		} else {
-			fetch = maxGuildFetchLimit
 		}
 
 		g, err := c.guildsRange(before, 0, fetch)
@@ -179,6 +182,9 @@ func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Gui
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) GuildsAfter(after discord.GuildID, limit uint) ([]discord.Guild, error) {
+	if after == 0{
+		after = 1	
+	}
 	var guilds []discord.Guild
 
 	fetch := uint(maxGuildFetchLimit)
@@ -191,8 +197,6 @@ func (c *Client) GuildsAfter(after discord.GuildID, limit uint) ([]discord.Guild
 			// we only need to fetch min(fetch, limit).
 			fetch = uint(min(maxGuildFetchLimit, int(limit)))
 			limit -= fetch
-		} else {
-			fetch = maxGuildFetchLimit
 		}
 
 		g, err := c.guildsRange(0, after, fetch)
@@ -211,16 +215,24 @@ func (c *Client) GuildsAfter(after discord.GuildID, limit uint) ([]discord.Guild
 
 func (c *Client) guildsRange(
 	before, after discord.GuildID, limit uint) ([]discord.Guild, error) {
-
+	select {
+		case limit > maxGuildFetchLimit:
+			limit = maxGuildFetchLimit
+		case limit == 0:
+			limit = defaultGuildFetchLimit
+	}
 	var param struct {
 		Before discord.GuildID `schema:"before,omitempty"`
 		After  discord.GuildID `schema:"after,omitempty"`
 
 		Limit uint `schema:"limit"`
 	}
-
-	param.Before = before
-	param.After = after
+	select {
+		case before > 0:
+			param.Before = before
+		case after > 0:
+			param.After = after
+	}
 	param.Limit = limit
 
 	var gs []discord.Guild
