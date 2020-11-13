@@ -137,14 +137,17 @@ func (c *Client) Guilds(limit uint) ([]discord.Guild, error) {
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Guild, error) {
-	guilds := make([]discord.Guild, 0, limit)
+	if before == 0 {
+		before = 1
+	}
+	var guilds []discord.Guild
 
 	fetch := uint(maxGuildFetchLimit)
 
 	unlimited := limit == 0
 
 	for limit > 0 || unlimited {
-		if limit > 0 {
+		if !unlimited {
 			// Only fetch as much as we need. Since limit gradually decreases,
 			// we only need to fetch min(fetch, limit).
 			if fetch > limit {
@@ -154,20 +157,12 @@ func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Gui
 		}
 
 		g, err := c.guildsRange(before, 0, fetch)
-		if err != nil {
+		if err != nil || len(guilds) == 0 {
 			return guilds, err
 		}
 		guilds = append(g, guilds...)
 
-		if len(g) < maxGuildFetchLimit {
-			break
-		}
-
 		before = g[0].ID
-	}
-
-	if len(guilds) == 0 {
-		return nil, nil
 	}
 
 	return guilds, nil
@@ -184,13 +179,16 @@ func (c *Client) GuildsBefore(before discord.GuildID, limit uint) ([]discord.Gui
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) GuildsAfter(after discord.GuildID, limit uint) ([]discord.Guild, error) {
-	guilds := make([]discord.Guild, 0, limit)
+	if after == 0 {
+		after = 1
+	}
+	var guilds []discord.Guild
 
 	fetch := uint(maxGuildFetchLimit)
 
 	unlimited := limit == 0
 
-	for limit > 0 || unlimited {
+	for !unlimited {
 		// Only fetch as much as we need. Since limit gradually decreases,
 		// we only need to fetch min(fetch, limit).
 		if limit > 0 {
@@ -201,37 +199,34 @@ func (c *Client) GuildsAfter(after discord.GuildID, limit uint) ([]discord.Guild
 		}
 
 		g, err := c.guildsRange(0, after, fetch)
-		if err != nil {
+		if err != nil || len(guilds) == 0 {
 			return guilds, err
 		}
 		guilds = append(guilds, g...)
 
-		if len(g) < maxGuildFetchLimit {
-			break
-		}
-
 		after = g[len(g)-1].ID
 	}
-
-	if len(guilds) == 0 {
-		return nil, nil
-	}
-
+	
 	return guilds, nil
 }
 
 func (c *Client) guildsRange(
 	before, after discord.GuildID, limit uint) ([]discord.Guild, error) {
-
+	if limit > maxGuildFetchLimit{
+		limit = maxGuildFetchLimit
+	}
 	var param struct {
 		Before discord.GuildID `schema:"before,omitempty"`
 		After  discord.GuildID `schema:"after,omitempty"`
 
 		Limit uint `schema:"limit"`
 	}
-
-	param.Before = before
-	param.After = after
+	switch {
+	case after > 0:
+		param.After = after
+	case before > 0:
+		param.Before = before
+	}
 	param.Limit = limit
 
 	var gs []discord.Guild
