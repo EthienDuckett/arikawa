@@ -123,7 +123,7 @@ func (c *Client) GuildWithCount(id discord.GuildID) (*discord.Guild, error) {
 //
 // Requires the guilds OAuth2 scope.
 func (c *Client) Guilds(limit uint) ([]discord.Guild, error) {
-	return c.GuildsAfter(0, limit)
+	return c.GuildsAfter(1, limit)
 }
 
 // GuildsBefore returns a list of partial guild objects the current user is a
