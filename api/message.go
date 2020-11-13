@@ -10,7 +10,6 @@ import (
 
 const (
 	// the limit of max messages per request, as imposed by Discord
-	defaultMessageFetchLimit = 50
 	maxMessageFetchLimit = 100
 	// maxMessageDeleteLimit is the limit of max message that can be deleted
 	// per bulk delete request, as imposed by Discord.
@@ -152,10 +151,7 @@ func (c *Client) MessagesAfter(
 func (c *Client) messagesRange(
 	channelID discord.ChannelID, before, after, around discord.MessageID, limit uint) ([]discord.Message, error) {
 
-	switch {
-	case limit == 0:
-		limit = defaultMessageFetchLimit
-	case limit > maxMessageFetchLimit:
+	if limit > maxMessageFetchLimit{
 		limit = maxMessageFetchLimit
 	}
 
